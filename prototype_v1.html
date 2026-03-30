@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Where Did I Put That? — Interactive Prototype</title>
+<script>
+var current = 's-signin';
+var hotspots = false;
+var toastTimer;
+var searchState = 0;
+var updateItem = { emoji:'', name:'', loc:'' };
+
+var screens = {
+  's-signin':        'Screen 01 — Sign In · Entry Path',
+  's-joinhousehold': 'Screen 02 — Join Household · Entry Path',
+  's-home':          'Screen 03 — Home · All Paths Begin Here',
+  's-camera':        'Screen 04 — Camera · Path A',
+  's-confirm':       'Screen 05 — Confirm & Save · Path A',
+  's-saved':         'Screen 05B — Item Saved · Path A',
+  's-search':        'Screen 06 — Search / Find Item · Path B',
+  's-result':        'Screen 06B — Baby Book Result · Path B',
+  's-found':         'Screen 06C — Baby Book Found · Path B',
+  's-result-epipen': 'Screen 06B — EpiPen Result · Path B',
+  's-found-epipen':  'Screen 06C — EpiPen Found · Path B',
+  's-result-keys':   'Screen 06B — Keys Result · Path B',
+  's-found-keys':    'Screen 06C — Keys Found · Path B',
+  's-alerts':        'Screen 07 — Notifications · Path D & E',
+  's-epipen-info':   'Screen — EpiPen Location Info · Path E',
+  's-result-jacket': 'Screen — Jacket Result · Path B',
+  's-found-jacket':  'Screen — Jacket Found · Path B',
+  's-menu':          'Screen 08 — Settings · Supporting',
+};
+
+function goTo(id, taskHint) {
+  if (id === current) return;
+  if (current === 's-search' || id === 's-search') {
+    searchState = 0;
+    var txt = document.getElementById('search-bar-text');
+    var cur = document.getElementById('search-bar-cursor');
+    var hint = document.getElementById('search-bar-hint');
+    if (txt) { txt.textContent = 'What are you looking for?'; txt.style.color = 'rgba(255,255,255,0.6)'; txt.style.fontWeight = '400'; }
+    if (cur) cur.style.display = 'none';
+    if (hint) hint.style.display = 'none';
+  }
+  var prev = document.getElementById(current);
+  var next = document.getElementById(id);
+  if (!next) return;
+  if (prev) { prev.classList.add('exit-left'); prev.classList.remove('active'); }
+  next.classList.add('active');
+  next.classList.remove('exit-left');
+  setTimeout(function() { if (prev) prev.classList.remove('exit-left'); }, 320);
+  current = id;
+  var ind = document.getElementById('screen-indicator');
+  if (ind) ind.textContent = screens[id] || id;
+  if (taskHint) {
+    var tb = document.getElementById('task-text');
+    if (tb) tb.innerHTML = taskHint;
+  }
+}
+
+function restart() {
+  var all = document.querySelectorAll('.screen');
+  all.forEach(function(s) { s.classList.remove('active','exit-left'); });
+  var first = document.getElementById('s-signin');
+  if (first) first.classList.add('active');
+  current = 's-signin';
+  searchState = 0;
+  updateItem = { emoji:'', name:'', loc:'' };
+  var ind = document.getElementById('screen-indicator');
+  if (ind) ind.textContent = screens['s-signin'];
+  var tb = document.getElementById('task-text');
+  if (tb) tb.innerHTML = 'You are Sarah. Tap <strong>Log In</strong> to begin.';
+}
+
+function startTask1() {
+  updateItem = { emoji:'', name:'', loc:'' };
+  goTo('s-home', '🧪 <strong>Task 1:</strong> You found the baby book on the counter. Log it so Michael knows where it is. Tap <strong>+ Log an Item.</strong>');
+}
+
+function startTask2() {
+  goTo('s-home', '🧪 <strong>Task 2:</strong> You cannot find the baby book. Use the app to find it. Tap <strong>Search.</strong>');
+}
+
+function toggleHotspots() {
+  hotspots = !hotspots;
+  document.body.classList.toggle('show-hotspots', hotspots);
+  var btn = document.getElementById('hotspot-btn');
+  if (btn) btn.textContent = hotspots ? 'Hide tappable areas' : 'Show tappable areas';
+}
+
+function resetLog() {
+  updateItem = { emoji:'', name:'', loc:'' };
+  var el = document.getElementById('confirm-emoji');
+  var en = document.getElementById('confirm-name');
+  var el2 = document.getElementById('confirm-loc');
+  if (el) el.textContent = '🖼';
+  if (en) en.textContent = 'Item name — tap to edit';
+  if (el2) el2.textContent = 'Location — tap to edit';
+}
+
+function applyConfirmItem() {
+  var el = document.getElementById('confirm-emoji');
+  var en = document.getElementById('confirm-name');
+  var el2 = document.getElementById('confirm-loc');
+  if (el) el.textContent = updateItem.emoji || '🖼';
+  if (en) en.textContent = updateItem.name || 'Item name — tap to edit';
+  if (el2) el2.textContent = updateItem.name ? updateItem.name + ' · ' + updateItem.loc : 'Location — tap to edit';
+  goTo('s-confirm', 'Photo taken! Review the suggested details. Tap Confirm & Save when ready.');
+}
+
+function goToUpdate(emoji, name, loc) {
+  updateItem = { emoji: emoji, name: name, loc: loc };
+  var el = document.getElementById('confirm-emoji');
+  var en = document.getElementById('confirm-name');
+  var el2 = document.getElementById('confirm-loc');
+  if (el) el.textContent = emoji;
+  if (en) en.textContent = name;
+  if (el2) el2.textContent = name + ' · ' + loc;
+  goTo('s-camera', 'Camera opens to update location. Tap shutter when ready.');
+}
+
+function goToSaved() {
+  var se = document.getElementById('saved-emoji');
+  var sn = document.getElementById('saved-item-name');
+  var sl = document.getElementById('saved-item-loc');
+  var sd = document.getElementById('saved-name-desc');
+  var name = updateItem.name || 'Your item';
+  var emoji = updateItem.emoji || '📦';
+  var loc = updateItem.loc || 'the location you chose';
+  if (se) se.textContent = emoji;
+  if (sn) sn.textContent = name;
+  if (sl) sl.textContent = '📍 ' + loc + ' · just now';
+  if (sd) sd.textContent = name + ' has been logged.';
+  goTo('s-saved', 'Item saved! The household has been notified.');
+}
+
+function handleSearch() {
+  if (searchState === 0) {
+    var txt = document.getElementById('search-bar-text');
+    var cur = document.getElementById('search-bar-cursor');
+    var hint = document.getElementById('search-bar-hint');
+    if (txt) { txt.textContent = 'Baby Book'; txt.style.color = '#fff'; txt.style.fontWeight = '600'; }
+    if (cur) cur.style.display = 'inline';
+    if (hint) hint.style.display = 'inline';
+    searchState = 1;
+    var tb = document.getElementById('task-text');
+    if (tb) tb.innerHTML = '🧪 You typed <strong>Baby Book</strong>. Tap the bar again to search.';
+  } else {
+    searchState = 0;
+    var txt = document.getElementById('search-bar-text');
+    var cur = document.getElementById('search-bar-cursor');
+    var hint = document.getElementById('search-bar-hint');
+    if (txt) { txt.textContent = 'What are you looking for?'; txt.style.color = 'rgba(255,255,255,0.6)'; txt.style.fontWeight = '400'; }
+    if (cur) cur.style.display = 'none';
+    if (hint) hint.style.display = 'none';
+    goTo('s-result', 'Result found! Baby Book is in the baby bag. Tap Mark as Found to complete the task.');
+  }
+}
+
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function() { t.classList.remove('show'); }, 2200);
+}
+</script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Fraunces:ital,wght@0,600;1,400&display=swap');
+
+:root {
+  --bg:       #FFFFFF;
+  --bg2:      #F4F2FA;
+  --bg3:      #EDE8F5;
+  --purple:   #4A3D6B;
+  --purple2:  #3A2D5A;
+  --purple3:  #2D2540;
+  --accent:   #E8956A;
+  --accentdk: #C5713E;
+  --lavlt:    #EDE8F5;
+  --text1:    #1A1230;
+  --text2:    #3D3558;
+  --text3:    #6B5D8F;
+  --textsub:  #8B7DAA;
+  --border:   #D4CCE8;
+  --success:  #2E7D52;
+  --successlt:#E8F5EE;
+  --red:      #C0392B;
+  --redlt:    #FDECEA;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: #1A1230;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 24px 16px 40px;
+}
+
+/* Header */
+.proto-header {
+  text-align: center;
+  margin-bottom: 20px;
+  color: rgba(255,255,255,0.9);
+}
+.proto-header h1 {
+  font-family: 'Fraunces', serif;
+  font-size: 18px; font-weight: 600;
+  margin-bottom: 4px;
+}
+.proto-header p { font-size: 11px; color: rgba(255,255,255,0.5); }
+
+/* Task banner */
+.task-banner {
+  background: rgba(232,149,106,0.15);
+  border: 1px solid rgba(232,149,106,0.4);
+  border-radius: 12px;
+  padding: 10px 16px;
+  margin-bottom: 20px;
+  width: 100%; max-width: 320px;
+  text-align: center;
+}
+.task-banner .task-label {
+  font-size: 9px; font-weight: 700; letter-spacing: 1.5px;
+  color: var(--accent); margin-bottom: 4px;
+}
+.task-banner .task-text {
+  font-size: 12px; color: rgba(255,255,255,0.85); line-height: 1.5;
+}
+
+/* Phone shell */
+.phone-shell {
+  width: 320px;
+  background: #0D0A1A;
+  border-radius: 44px;
+  padding: 12px;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06);
+  position: relative;
+}
+.phone-shell::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 50%; transform: translateX(-50%);
+  width: 120px; height: 4px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 0 0 4px 4px;
+}
+
+/* Dynamic island */
+.island {
+  width: 80px; height: 24px;
+  background: #0D0A1A;
+  border-radius: 20px;
+  margin: 4px auto 8px;
+  position: relative; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+}
+.island-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%; background: #1a1a2e;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+/* Screen wrapper */
+.screen-wrap {
+  background: var(--bg);
+  border-radius: 34px;
+  overflow: hidden;
+  height: 580px;
+  position: relative;
+}
+
+/* Individual screens */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex; flex-direction: column;
+  opacity: 0; pointer-events: none;
+  transform: translateX(100%);
+  transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.4,0,0.2,1);
+  background: var(--bg);
+  overflow: hidden;
+}
+.screen.active {
+  opacity: 1; pointer-events: all;
+  transform: translateX(0);
+}
+.screen.exit-left {
+  opacity: 0; pointer-events: none;
+  transform: translateX(-40%);
+}
+
+/* Status bar */
+.status {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 18px 4px;
+  font-size: 10px; font-weight: 700; color: var(--text1);
+  flex-shrink: 0;
+}
+.status.light { color: rgba(255,255,255,0.9); }
+.status-icons { display: flex; gap: 5px; align-items: center; font-size: 10px; }
+
+/* Nav bar */
+.nav {
+  display: flex; justify-content: space-around; align-items: center;
+  background: var(--purple3);
+  padding: 8px 0 12px;
+  flex-shrink: 0;
+}
+.nav-item {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  font-size: 9px; font-weight: 600; color: rgba(255,255,255,0.45);
+  cursor: pointer; padding: 4px 12px; border-radius: 8px;
+  transition: color 0.15s;
+}
+.nav-item.active { color: #fff; }
+.nav-item:active { background: rgba(255,255,255,0.08); }
+.nav-icon { font-size: 16px; }
+
+/* Scroll body */
+.screen-body {
+  flex: 1; overflow-y: auto; padding: 12px 18px;
+  display: flex; flex-direction: column; gap: 11px;
+  -webkit-overflow-scrolling: touch;
+}
+.screen-body::-webkit-scrollbar { display: none; }
+
+/* Top bar */
+.top-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 18px 2px; flex-shrink: 0;
+}
+.back-btn {
+  font-size: 12px; color: var(--purple); font-weight: 600;
+  cursor: pointer; padding: 4px 0;
+}
+.top-title { font-size: 16px; font-weight: 700; color: var(--text1); }
+.top-action { font-size: 12px; color: var(--accent); font-weight: 700; cursor: pointer; }
+
+/* Buttons */
+.btn { border: none; border-radius: 14px; padding: 13px 0; width: 100%; font-size: 14px; font-weight: 700; cursor: pointer; text-align: center; transition: opacity 0.15s, transform 0.1s; font-family: 'DM Sans', sans-serif; }
+.btn:active { opacity: 0.85; transform: scale(0.98); }
+.btn-primary { background: var(--purple); color: #fff; }
+.btn-secondary { background: var(--bg); color: var(--purple); border: 2px solid var(--purple); }
+.btn-accent { background: var(--accent); color: #fff; }
+.btn-success { background: var(--success); color: #fff; }
+.btn-sm { padding: 9px 0; font-size: 12px; border-radius: 10px; }
+
+/* Input */
+.input-field {
+  border: 1.5px solid var(--border); border-radius: 12px;
+  padding: 12px 14px; font-size: 13px; color: var(--text1);
+  background: var(--bg2); display: flex; align-items: center; gap: 8px;
+}
+.input-field.filled { border-color: var(--purple); background: #fff; }
+.input-placeholder { color: var(--textsub); font-size: 12px; }
+
+/* Search bar */
+.search-bar {
+  background: var(--purple); border-radius: 14px;
+  padding: 12px 14px; display: flex; align-items: center; gap: 9px;
+  color: #fff; font-size: 13px; cursor: pointer;
+}
+.search-placeholder { color: rgba(255,255,255,0.65); font-size: 12px; }
+
+/* Item card */
+.item-card {
+  background: var(--lavlt); border-radius: 14px;
+  padding: 12px 14px; display: flex; align-items: center; gap: 11px;
+  border-left: 3px solid var(--purple); cursor: pointer;
+  transition: background 0.15s;
+}
+.item-card:active { background: #DDD6ED; }
+.item-icon {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: var(--purple); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; flex-shrink: 0;
+}
+.item-name { font-size: 13px; font-weight: 700; color: var(--text1); }
+.item-loc  { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.item-time { font-size: 11px; color: var(--textsub); font-weight: 600; }
+
+/* Section label */
+.sec { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; color: var(--text3); text-transform: uppercase; }
+
+/* Step dots */
+.step-bar { display: flex; gap: 4px; padding: 0 18px 8px; flex-shrink: 0; }
+.step-dot { height: 3px; border-radius: 2px; flex: 1; background: var(--border); }
+.step-dot.done { background: var(--purple); }
+.step-dot.active { background: var(--accent); }
+
+/* Tab bar */
+.tab-bar { display: flex; border-bottom: 1.5px solid var(--border); padding: 0 18px; flex-shrink: 0; }
+.tab { font-size: 12px; font-weight: 600; padding: 7px 10px; color: var(--textsub); border-bottom: 2px solid transparent; margin-bottom: -1.5px; cursor: pointer; }
+.tab.active { color: var(--purple); border-bottom-color: var(--accent); }
+
+/* Alert card */
+.alert-card { border: 1.5px solid var(--border); border-radius: 12px; padding: 11px 13px; background: #fff; display: flex; gap: 9px; cursor: pointer; transition: background 0.15s; }
+.alert-card.new { border-color: var(--purple); background: var(--lavlt); }
+.alert-card:active { opacity: 0.8; }
+.alert-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--purple); flex-shrink: 0; margin-top: 3px; }
+.alert-dot.faded { background: var(--border); }
+.alert-title { font-size: 12px; font-weight: 700; color: var(--text1); }
+.alert-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.alert-time { font-size: 10px; color: var(--textsub); margin-top: 4px; }
+
+/* Menu row */
+.menu-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--bg3); cursor: pointer; }
+.menu-row:last-child { border-bottom: none; }
+.menu-row:active { opacity: 0.7; }
+.menu-row-left { display: flex; align-items: center; gap: 11px; }
+.menu-icon-wrap { width: 30px; height: 30px; border-radius: 9px; background: var(--lavlt); color: var(--purple); display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+.menu-icon-wrap.red { background: var(--redlt); }
+.menu-icon-wrap.accent { background: #FDF0E8; }
+.menu-label { font-size: 13px; font-weight: 600; color: var(--text1); }
+.menu-sub { font-size: 10px; color: var(--textsub); margin-top: 1px; }
+.chevron { font-size: 14px; color: var(--textsub); }
+
+/* Hotspot indicator */
+.hotspot {
+  position: relative;
+}
+.hotspot::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 1.5px dashed rgba(232,149,106,0.5);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+body.show-hotspots .hotspot::after { opacity: 1; }
+
+/* Bottom controls */
+.proto-controls {
+  margin-top: 20px;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  width: 100%; max-width: 320px;
+}
+.screen-indicator {
+  font-size: 11px; color: rgba(255,255,255,0.45);
+  text-align: center; min-height: 18px;
+}
+.ctrl-row { display: flex; gap: 10px; width: 100%; }
+.ctrl-btn {
+  flex: 1; padding: 10px; border-radius: 12px;
+  font-size: 11px; font-weight: 700; cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.7);
+  font-family: 'DM Sans', sans-serif;
+  transition: background 0.15s;
+}
+.ctrl-btn:active { background: rgba(255,255,255,0.12); }
+.ctrl-btn.primary { background: var(--purple); border-color: var(--purple); color: #fff; }
+
+/* Overlay toast */
+.toast {
+  position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: var(--purple3); color: #fff; font-size: 12px; font-weight: 600;
+  padding: 10px 20px; border-radius: 24px;
+  opacity: 0; transition: all 0.3s; pointer-events: none; white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  z-index: 100;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* Blinking cursor for search typing state */
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+#search-bar-cursor { animation: blink 1s step-end infinite; font-size:14px; }
+.camera-bg { background: #0D0A1A; flex: 1; display: flex; flex-direction: column; }
+.viewfinder {
+  flex: 1; margin: 8px 16px; border-radius: 18px;
+  background: #1A1530; position: relative;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.vf-corner { position: absolute; width: 24px; height: 24px; }
+.vf-corner.tl { top: 14px; left: 14px; border-top: 3px solid var(--accent); border-left: 3px solid var(--accent); border-radius: 3px 0 0 0; }
+.vf-corner.tr { top: 14px; right: 14px; border-top: 3px solid var(--accent); border-right: 3px solid var(--accent); border-radius: 0 3px 0 0; }
+.vf-corner.bl { bottom: 14px; left: 14px; border-bottom: 3px solid var(--accent); border-left: 3px solid var(--accent); border-radius: 0 0 0 3px; }
+.vf-corner.br { bottom: 14px; right: 14px; border-bottom: 3px solid var(--accent); border-right: 3px solid var(--accent); border-radius: 0 0 3px 0; }
+.shutter-row { display: flex; justify-content: space-around; align-items: center; padding: 14px 28px 20px; }
+.shutter-btn { width: 58px; height: 58px; border-radius: 50%; border: 3px solid #fff; background: rgba(255,255,255,0.9); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.1s; }
+.shutter-btn:active { transform: scale(0.92); }
+.shutter-inner { width: 46px; height: 46px; border-radius: 50%; background: #fff; border: 2px solid rgba(0,0,0,0.1); }
+.cam-icon-btn { width: 32px; height: 32px; background: rgba(255,255,255,0.12); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div class="proto-header">
+  <h1>Where Did I Put That?</h1>
+  <p>Interactive Prototype · INM400SAA · Sprint 2</p>
+</div>
+
+<div class="task-banner">
+  <div class="task-label">🧪 Usability Test Task</div>
+  <div class="task-text" id="task-text">You are Sarah. Tap <strong>Log In</strong> to begin.</div>
+</div>
+
+<div class="phone-shell">
+  <div class="island"><div class="island-dot"></div></div>
+  <div class="screen-wrap">
+
+    <!-- ══ SCREEN 1: SIGN IN ══ -->
+    <div class="screen active" id="s-signin">
+      <div class="status"><span>9:41</span><div class="status-icons"><span>●●●</span><span>WiFi</span><span>▮</span></div></div>
+      <div class="screen-body" style="justify-content:center; padding-top:28px;">
+        <div style="text-align:center; margin-bottom:16px;">
+          <div style="width:64px;height:64px;background:var(--purple);border-radius:20px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:28px;">🏠</div>
+          <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:600;color:var(--text1);">Where Did I Put It?</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:5px;">Shared item tracker for caregivers</div>
+        </div>
+        <div style="height:1px;background:var(--border);margin:6px 0 14px;"></div>
+        <div class="input-field"><span>✉️</span><span class="input-placeholder">Email address</span></div>
+        <div class="input-field filled"><span>🔒</span><span style="color:var(--text1);font-weight:500;">••••••••</span></div>
+        <button class="btn btn-primary hotspot" onclick="goTo('s-joinhousehold', 'Tap Continue → to set up your household.')">Log In</button>
+        <div style="text-align:center;font-size:11px;color:var(--textsub);">— or —</div>
+        <button class="btn btn-secondary" onclick="showToast('Create Account flow not in this prototype')">Create Account</button>
+      </div>
+    </div>
+
+    <!-- ══ SCREEN 2: JOIN HOUSEHOLD ══ -->
+    <div class="screen" id="s-joinhousehold">
+      <div class="status"><span>9:41</span><div class="status-icons"><span>●●●</span><span>WiFi</span><span>▮</span></div></div>
+      <div class="step-bar"><div class="step-dot done"></div><div class="step-dot active"></div><div class="step-dot"></div></div>
+      <div class="screen-body" style="padding-top:4px;">
+        <div style="font-size:9px;font-weight:700;color:var(--accent);letter-spacing:1.5px;">STEP 2 OF 3 — HOUSEHOLD SETUP</div>
+        <div style="font-size:18px;font-weight:700;color:var(--text1);">Set up your household</div>
+        <div class="input-field"><span>🏠</span><span class="input-placeholder">Household Name</span></div>
+        <button class="btn btn-accent btn-sm" style="font-size:12px;" onclick="showToast('Invite sent to caregiver!')">✉ Invite Caregiver (Email)</button>
+        <div class="sec">Invited</div>
+        <div style="display:flex;align-items:center;gap:9px;padding:10px 12px;background:var(--lavlt);border-radius:12px;">
+          <div style="width:32px;height:32px;border-radius:50%;background:var(--purple);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0;">M</div>
+          <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--text1);">Michael Chen</div><div style="font-size:10px;color:var(--textsub);">Invite sent · pending</div></div>
+          <div style="font-size:10px;font-weight:700;color:var(--accent);">PENDING</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:9px;padding:10px 12px;background:var(--successlt);border-radius:12px;">
+          <div style="width:32px;height:32px;border-radius:50%;background:var(--success);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0;">S</div>
+          <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--text1);">Sarah Chen</div><div style="font-size:10px;color:var(--success);font-weight:600;">You · Admin</div></div>
+          <div style="font-size:11px;font-weight:700;color:var(--success);">✓</div>
+        </div>
+        <button class="btn btn-primary hotspot" onclick="goTo('s-home', 'You are on the Home screen. Michael logged 2 items today. Tap +Log an Item to log something, or tap Search to find an item.')">Continue →</button>
+        <button class="btn btn-secondary btn-sm" style="font-size:12px;" onclick="goTo('s-home', 'You are on the Home screen.')">Skip for Now</button>
+      </div>
+    </div>
+
+    <!-- ══ SCREEN 3: HOME ══ -->
+    <div class="screen" id="s-home">
+      <div class="status"><span>9:41</span><div class="status-icons"><span>●●●</span><span>WiFi</span><span>▮</span></div></div>
+      <div class="screen-body" style="padding-top:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <div style="font-size:12px;color:var(--text3);font-weight:500;">Good morning</div>
+            <div style="font-size:26px;font-weight:700;color:var(--text1);line-height:1.1;">Sarah</div>
+            <div style="font-size:11px;color:var(--purple);font-weight:600;margin-top:3px;">Michael logged 2 items today</div>
+          </div>
+          <div style="width:38px;height:38px;background:var(--purple);border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:17px;cursor:pointer;" onclick="goTo('s-menu', 'This is the Settings menu.')">☰</div>
+        </div>
+
+        <!-- PATH E — Gentle Reminder Banner -->
+        <div onclick="goTo('s-epipen-info', 'This is the EpiPen location info. No need to search — the app already told you where it is.')" style="background:var(--successlt);border:1.5px solid #a8d5ba;border-radius:14px;padding:11px 13px;display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+          <div style="font-size:18px;flex-shrink:0;margin-top:1px;">✅</div>
+          <div style="flex:1;">
+            <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;color:var(--success);margin-bottom:3px;">REMINDER</div>
+            <div style="font-size:12px;font-weight:700;color:var(--text1);">EpiPen is packed</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px;">Logged by Michael · baby bag · 5 min ago</div>
+          </div>
+          <div style="font-size:12px;color:var(--success);font-weight:700;flex-shrink:0;">›</div>
+        </div>
+
+        <div class="search-bar hotspot" onclick="goTo('s-search', 'You are on the Search screen. Type Baby Book to find it.')">
+          <span>🔍</span><span class="search-placeholder">What are you looking for?</span>
+        </div>
+        <div class="tab-bar">
+          <div class="tab active">All</div>
+          <div class="tab">Sarah</div>
+          <div class="tab">Michael</div>
+          <div class="tab">Mom</div>
+        </div>
+        <div class="sec">Michael logged today</div>
+        <div class="item-card hotspot" onclick="goTo('s-result', 'Baby Book is in the baby bag · hallway. Logged by Michael 2 min ago.')">
+          <div class="item-icon">📖</div>
+          <div style="flex:1;"><div class="item-name">Baby Book</div><div class="item-loc">📍 Baby bag · hallway</div></div>
+          <div class="item-time">2m</div>
+        </div>
+        <div class="item-card hotspot" onclick="goTo('s-result-jacket', 'Jacket is on the hallway hook. Logged by Michael 1 hour ago.')">
+          <div class="item-icon">🧥</div>
+          <div style="flex:1;"><div class="item-name">Jacket</div><div class="item-loc">📍 Hallway hook</div></div>
+          <div class="item-time">1h</div>
+        </div>
+        <button class="btn btn-primary hotspot" onclick="resetLog();goTo('s-camera','Camera is open. Point at the item and tap the shutter button.')">+ Log an Item</button>
+      </div>
+      <div class="nav">
+        <div class="nav-item active" onclick="goTo('s-home','')"><div class="nav-icon">🏠</div>Home</div>
+        <div class="nav-item" onclick="resetLog();goTo('s-camera','Camera is open.')"><div class="nav-icon">📷</div>Log</div>
+        <div class="nav-item" onclick="goTo('s-search', 'You are on the Search screen.')"><div class="nav-icon">🔍</div>Search</div>
+        <div class="nav-item" onclick="goTo('s-alerts', 'You are on the Notifications screen.')"><div class="nav-icon">🔔</div>Notifications</div>
+      </div>
+    </div>
+
+    <!-- ══ SCREEN 4: CAMERA ══ -->
+    <div class="screen camera-bg" id="s-camera">
+      <div class="status light"><span>9:41</span><div class="status-icons" style="color:rgba(255,255,255,0.9);"><span>●●●</span><span>WiFi</span><span>▮</span></div></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 18px 6px;flex-shrink:0;">
+        <div style="font-size:12px;font-weight:600;color:#fff;cursor:pointer;" onclick="goTo('s-home','')">✕ Cancel</div>
+        <div style="background:var(--accent);border-radius:9px;padding:5px 12px;font-size:11px;font-weight:700;color:#fff;">Tap Once</div>
+        <div style="width:34px;"></div>
+      </div>
+      <div class="viewfinder">
+        <div class="vf-corner tl"></div>
+        <div class="vf-corner tr"></div>
+        <div class="vf-corner bl"></div>
+        <div class="vf-corner br"></div>
+        <div style="text-align:center;opacity:0.35;">
+          <div style="font-size:40px;">🖼</div>
+          <div style="font-size:10px;color:#fff;margin-top:8px;">Point at item</div>
+        </div>
+      </div>
+      <div class="shutter-row">
+        <div class="cam-icon-btn" onclick="showToast('Gallery — not in this prototype')">🖼</div>
+        <div class="shutter-btn hotspot" onclick="applyConfirmItem()">
+          <div class="shutter-inner"></div>
+        </div>
+        <div class="cam-icon-btn" onclick="showToast('Camera flipped')">🔄</div>
+      </div>
+    </div>
+
+    <!-- ══ SCREEN 5: CONFIRM & SAVE ══ -->
+    <div class="screen" id="s-confirm">
+      <div class="status"><span>9:41</span><div class="status-icons"><span>●●●</span><span>WiFi</span><span>▮</span></div></div>
+      <div class="top-bar">
+        <div class="back-btn" onclick="goTo('s-camera','')">‹ Retake</div>
+        <div class="top-title">Confirm Item</div>
+        <div style="width:40px;"></div>
+      </div>
+      <div class="screen-body" style="padding-top:6px;">
+        <div style="background:var(--bg3);border-radius:16px;height:110px;display:flex;align-items:center;justify-content:center;border:2px dashed var(--border);position:relative;">
+          <div id="confirm-emoji" style="font-size:36px;opacity:0.5;">🖼</div>
+          <div style="position:absolute;bottom:10px;right:12px;background:var(--purple);color:#fff;font-size:9px;font-weight:700;padding:4px 9px;border-radius:7px;">Photo preview</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--purple);">AUTO-SUGGESTED</div>
+          <div style="font-size:9px;color:var(--accent);font-weight:600;">✏ Tap to edit</div>
+        </div>
+        <div style="border:2px solid var(--purple);border-radius:13px;padding:12px 14px;background:#fff;display:flex;align-items:center;gap:9px;" onclick="showToast('In the real app, tap here to edit the item name')">
+          <span id="confirm-name-icon" style="font-size:14px;">📝</span>
+          <span id="confirm-name" style="font-size:13px;font-weight:500;color:var(--textsub);">Item name — tap to edit</span>
+          <span style="font-size:12px;color:var(--textsub);margin-left:auto;">✏</span>
+        </div>
+        <div style="border:2px solid var(--accent);border-radius:13px;padding:12px 14px;background:#FDF0E8;" onclick="showToast('In the real app, tap here to edit the location')">
+          <div style="font-size:9px;font-weight:700;color:var(--accentdk);margin-bottom:4px;">📍 Location · Tap to Edit ✏</div>
+          <div id="confirm-loc" style="font-size:13px;font-weight:500;color:var(--textsub);">Location — tap to edit</div>
+        </div>
+        <button class="btn btn-accent hotspot" onclick="goToSaved()">✓ Confirm & Save</button>
+        <button class="btn btn-secondary btn-sm" style="font-size:12px;" onclick="goTo('s-home','')">Skip for Now</button>
+      </div>
+      <div class="nav">
+        <div class="nav-item" onclick="goTo('s-home','')"><div class="nav-icon">🏠</div>Home</div>
+        <div class="nav-item active"><div class="nav-icon">📷</div>Log</div>
+        <div class="nav-item" onclick="goTo('s-search','')"><div class="nav-icon">🔍</div>Search</div>
+        <div class="nav-item" onclick="goTo('s-alerts','')"><div class="nav-icon">🔔</div>Notifications</div>
+      </div>
+    </div>
+
+    <!-- ══ SCREEN 5B: SAVED CONFIRMATION ══ -->
+    <div class="screen" id="s-saved">
+      <div class="status"><span>9:41</span><div class="status-icons"><span>●●●</span><span>WiFi</span><span>▮</span></div></div>
+      <div class="screen-body" style="align-items:center;justify-content:center;text-align:center;gap:16px;padding:32px 28px;">
+        <div style="width:72px;height:72px;background:var(--successlt);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:34px;margin:0 auto;">✅</div>
+        <div style="font-size:22px;font-weight:700;color:var(--text1);">Item Saved!</div>
+        <div style="font-size:13px;color:var(--text3);line-height:1.6;" id="saved-desc"><span id="saved-name-desc">Baby Book</span> has been logged.<br>Michael and Mom have been notified.</div>
+        <div style="background:var(--lavlt);border-radius:14px;padding:14px 18px;width:100%;text-align:left;">
+          <div style="font-size:10px;font-weight:700;color:var(--purple);letter-spacing:1px;margin-bottom:6px;">LOGGED ITEM</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:36px;height:36px;border-radius:10px;background:var(--purple);display:flex;align-items:center;justify-content:center;font-size:16px;" id="saved-emoji">📖</div>
+            <div><div style="font-size:13px;font-weight:700;color:var(--text1);" id="saved-item-name">Baby Book</div><div style="font-size:11px;color:var(--text3);" id="saved-item-loc">📍 Baby Bag · Hallway · just now</div></div>
+          </div>
+        </div>
+        <button class="btn btn-primary hotspot" onclick="goTo('s-home', 'Back on Home. You can now try Task 2 — find the Baby Book using Search.')">Back to Home</button>
+      </div>
+    </div>
+
+    <!-- ══ SCREEN 6: SEARCH ══ -->
+    <div class="screen" id="s-search">
+      <div class="status"><span>9:41</span><div class="status-icons"><span>●●●</span><span>WiFi</span><span>▮</span></div></div>
+      <div class="top-bar">
+        <div class="back-btn" onclick="goTo('s-home','')">‹ Home</div>
+        <div class="top-title">Find Item</div>
+        <div style="font-size:18px;color:var(--purple);cursor:pointer;" onclick="showToast('Filter settings')">⚙</div>
+      </div>
+      <div class="screen-body" style="padding-top:6px;">
+        <div class="search-bar hotspot" id="search-bar-main" onclick="handleSearch()" style="cursor:pointer;">
+          <span>🔍</span>
+          <span id="search-bar-text" style="color:rgba(255,255,255,0.6);font-size:12px;">What are you looking for?</span>
+          <span id="search-bar-cursor" style="color:#fff;font-weight:700;display:none;">|</span>
+          <span id="search-bar-hint" style="color:rgba(255,255,255,0.45);font-size:10px;margin-left:auto;display:none;">Tap again to search →</span>
+        </div>
+        <div class="sec">Recent searches</div>
+        <div style="display:flex;gap:7px;flex-wrap:wrap;">
+          <div style="background:var(--lavlt);border-radius:8px;padding:6px 14px;font-size:11px;font-weight:600;color:var(--purple);cursor:pointer;min-height:30px;display:flex;align-items:center;" onclick="goTo('s-result-epipen','')">💉 EpiPen</div>
+          <div style="background:var(--lavlt);border-radius:8px;padding:6px 14px;font-size:11px;font-weight:600;color:var(--purple);cursor:pointer;min-height:30px;display:flex;align-items:center;" onclick="goTo('s-result-keys','')">🔑 Keys</div>
+          <div style="background:var(--lavlt);border-radius:8px;padding:6px 14px;font-size:11px;font-weight:600;color:var(--purple);cursor:pointer;min-height:30px;display:flex;align-items:center;" onclick="goTo('s-result-jacket','')">🧥 Jacket</div>
+        </div>
+        <div class="sec" style="margin-top:4px;">All items</div>
+        <div class="item-card" onclick="goTo('s-result','')">
+          <div class="item-icon">📖</div>
+          <div style="flex:1;"><div class="item-name">Baby Book</div><div class="item-loc">📍 Baby bag · hallway</div></div>
+          <div class="item-time">2m</div>
+        </div>
+        <div class="item-card" onclick="goTo('s-result-epipen', 'Result found! EpiPen is in the medicine cabinet.')">
+          <div class="item-icon">💉</div>
+          <div style="flex:1;"><div class="item-name">EpiPen</div><div class="item-loc">📍 Medicine cabinet</div></div>
+          <div class="item-time">3h</div>
+        </div>
+        <div class="item-card" onclick="goTo('s-result-keys', 'Result found! Keys are on the kitchen counter.')">
+          <div class="item-icon">🔑</div>
+          <div style="flex:1;"><div class="item-name">Keys</div><div class="item-loc">📍 Kitchen counter</div></div>
+          <div class="item-time">3h</div>
+        </div>
+      </div>
+      <div class="nav">
+        <div class="nav-item" onclick="goTo('s-home','')"><div class="nav-icon">🏠</div>Home</div>
+        <div class="nav-item" onclick="goTo('s-camera','')"><div class="nav-icon">📷</div>Log</div>
+        <div class="nav-item active"><div class="nav-icon">🔍</div>Search</div>
+        <div class="nav-item" onclick="goTo('s-alerts','')"><div class="nav-icon">🔔</div>Notifications</div>
+      </div>
+    </div>
+
+    <!-- ══ SCREEN 6B: SEARCH RESULT ══ -->
+    <div class="screen" id="s-result">
+      <div class="status"><span>9:41</span><div class="status-icons"><span>●●●</span><span>WiFi</span><span>▮</span></div></div>
+      <div class="top-bar">
+        <div class="back-btn" onclick="goTo('s-search','')">‹ Search</div>
+        <div class="top-title">Find Item</div>
+        <div style="width:40px;"></div>
+      </div>
+      <div class="screen-body" style="padding-top:6px;">
+        <div class="search-bar"><span>🔍</span><span style="color:#fff;font-weight:600;">Baby Book</span></div>
+        <div class="sec">Result</div>
+        <div style="border:2px solid var(--purple);border-radius:16px;padding:14px;background:var(--lavlt);">
+          <div style="font-size:10px;font-weight:700;color:var(--success);letter-spacing:1px;margin-bottom:5px;">✓ FOUND · 2 MIN AGO</div>
+          <div style="font-size:20px;font-weight:700;color:var(--text1);">Baby Book</div>
+          <div style="font-size:12px;color:var(--purple);font-weight:600;margin-top:4px;">📍 In the baby bag · hallway</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:3px;">👤 Logged by Michael · 2 min ago</div>
+          <div style="display:flex;gap:9px;margin-top:12px;">
+            <button class="btn btn-success btn-sm hotspot" style="flex:1;font-size:12px;" onclick="goTo('s-found','Task complete! You found the Baby Book.')">✓ Mark as found</button>
+            <button class="btn btn-secondary btn-sm" style="flex:1;font-size:12px;border-color:var(--purple);" onclick="goToUpdate('📖','Baby Book','Hallway')">📷 Update</button>
+          </div>
+        </div>
+        <div class="sec" style="margin-top:4px;">Related items <span style="font-size:9px;color:var(--textsub);font-weight:400;letter-spacing:0;">— tap to view</span></div>
+        <div style="display:flex;gap:10px;">
+          <div style="flex:1;border:1.5px solid var(--border);border-radius:13px;padding:12px;text-align:center;background:#fff;cursor:pointer;" onclick="showToast('Baby Book — in the baby bag')">
+            <div style="font-size:22px;margin-bottom:5px;">📖</div>
+            <div style="font-size:11px;font-weight:700;color:var(--text1);">Baby Book</div>
+          </div>
+          <div style="flex:1;border:1.5px solid var(--border);border-radius:13px;padding:12px;text-align:center;background:#fff;cursor:pointer;" onclick="showToast('EpiPen — medicine cabinet')">
+            <div style="font-size:22px;margin-bottom:5px;">💉</div>
+            <div style="font-size:11px;font-weight:700;color:var(--text1);">EpiPen</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav">
+        <div class="nav-item" onclick="goTo('s-home','')"><div class="nav-icon">🏠</div>Home</div>
+        <div class="nav-item" onclick="goTo('s-camera','')"><div class="nav-icon">📷</div>Log</div>
+        <div class="nav-item active"><div class="nav-icon">🔍</div>Search</div>
+        <div class="nav-item" onclick="goTo('s-alerts','')"><div class="nav-icon">🔔</div>Notifications</div>
+      </div>
+    </div>
+
+    <!-- ══ SCREEN 6C: MARKED AS FOUND ══ -->
+    <div class="screen" id="s-found">
+      <div class="status"><span>9:41</span><div class="status-icons"><span>●●●</span><span>WiFi</span><span>▮</span></div></div>
+      <div class="screen-body" style="align-items:center;justify-content:center;text-align:center;gap:16px;padding:32px 28px;">
+        <div style="width:72px;height:72px;background:var(--successlt);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:34px;margin:0 auto;">✅</div>
+        <div style="font-size:22px;font-weight:700;color:var(--text1);">Marked as Found!</div>
+        <div style="font-size:13px;color:var(--text3);line-height:1.6;">Baby Book has been marked as found.<br>The household has been notified.</div>
+        <div style="background:var(--successlt);border-radius:14px;padding:12px 16px;width:100%;text-align:left;border:1.5px solid #a8d5ba;">
+          <div style="font-size:11px;font-weight:700;color:var(--success);">✓ Task complete — Baby Book found in the baby bag in the hallway.</div>
+        </div>
+        <button class="btn btn-primary hotspot" onclick="goTo('s-home','You completed both tasks! Great job.')">Back to Home</button>
+        <button class="btn btn-secondary btn-sm" onclick="goTo('s-alerts','Check your alerts to see the update.')">View Alerts</button>
+      </div>
+    </div>
+
+    <!-- ══ EPIPEN RESULT ══ -->
+    <div class="screen" id="s-result-epipen">
+      <div class="status"><span>9:41</span><div class="status-icons"><span>●●●</span><span>WiFi</span><span>▮</span></div></div>
+      <div class="top-bar">
+        <div class="back-btn" onclick="goTo('s-search','')">‹ Search</div>
+        <div class="top-title">Find Item</div>
+        <div style="width:40px;"></div>
+      </div>
+      <div class="screen-body" style="padding-top:6px;">
+        <div class="search-bar"><span>🔍</span><span style="color:#fff;font-weight:600;">EpiPen</span></div>
+        <div class="sec">Result</div>
+        <div style="border:2px solid var(--purple);border-radius:16px;padding:14px;background:var(--lavlt);">
+          <div style="font-size:10px;font-weight:700;color:var(--success);letter-spacing:1px;margin-bottom:5px;">✓ FOUND · 3 HRS AGO</div>
+          <div style="font-size:20px;font-weight:700;color:var(--text1);">EpiPen</div>
+          <div style="font-size:12px;color:var(--purple);font-weight:600;margin-top:4px;">📍 Medicine cabinet</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:3px;">👤 Logged by Sarah · 3 hrs ago</div>
+          <div style="display:flex;gap:9px;margin-top:12px;">
+            <button class="btn btn-success btn-sm hotspot" style="flex:1;font-size:12px;" onclick="goTo('s-found-epipen','Task complete! EpiPen marked as found.')">✓ Mark as found</button>
+            <button class="btn btn-secondary btn-sm" style="flex:1;font-size:12px;border-color:var(--purple);" onclick="goToUpdate('💉','EpiPen','Medicine Cabinet')">📷 Update</button>
+          </div>
+        </div>
+        <div class="sec" style="margin-top:4px;">Related items <span style="font-size:9px;color:var(--textsub);font-weight:400;letter-spacing:0;">— tap to view</span></div>
+        <div style="display:flex;gap:10px;">
+          <div style="flex:1;border:1.5px solid var(--border);border-radius:13px;padding:12px;text-align:center;background:#fff;cursor:pointer;" onclick="goTo('s-result','')">
+            <div style="font-size:22px;margin-bottom:5px;">📖</div>
+            <div style="font-size:11px;font-weight:700;color:var(--text1);">Baby Book</div>
+          </div>
+          <div style="flex:1;border:1.5px solid var(--border);border-radius:13px;padding:12px;text-align:center;background:#fff;cursor:pointer;" onclick="goTo('s-result-keys','')">
+            <div style="font-size:22px;margin-bottom:5px;">🔑</div>
+            <div style="font-size:11px;font-weight:700;color:var(--text1);">Keys</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav">
+        <div class="nav-item" onclick="goTo('s-home','')"><div class="nav-icon">🏠</div>Home</div>
+        <div class="nav-item" onclick="goTo('s-camera','')"><div class="nav-icon">📷</div>Log</div>
+        <div class="nav-item active"><div class="nav-icon">🔍</div>Search</div>
+        <div class="nav-item" onclick="goTo('s-alerts','')"><div class="nav-icon">🔔</div>Notifications</div>
+      </div>
+    </div>
+
+    <!-- ══ EPIPEN MARKED AS FOUND ══ -->
+    <div class="screen" id="s-found-epipen">
+      <div class="status"><span>9:41</span><div class="status-icons"><span>●●●</span><span>WiFi</span><span>▮</span></div></div>
+      <div class="screen-body" style="align-items:center;justify-content:center;text-align:center;gap:16px;padding:32px 28px;">
+        <div style="width:72px;height:72px;background:var(--successlt);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:34px;margin:0 auto;">✅</div>
+        <div style="font-size:22px;font-weight:700;color:var(--text1);">Marked as Found!</div>
+        <div style="font-size:13px;color:var(--text3);line-height:1.6;">EpiPen has been marked as found.<br>The household has been notified.</div>
+        <div style="background:var(--successlt);border-radius:14px;padding:12px 16px;width:100%;text-align:left;border:1.5px solid #a8d5ba;">
+          <div style="font-size:11px;font-weight:700;color:var(--success);">✓ EpiPen found in the medicine cabinet.</div>
+        </div>
+        <button class="btn btn-primary hotspot" onclick="goTo('s-home','')">Back to Home</button>
+        <button class="btn btn-secondary btn-sm" onclick="goTo('s-alerts','')">View Alerts</button>
+      </div>
+    </div>
+
+    <!-- ══ KEYS RESULT ══ -->
+    <div class="screen" id="s-result-keys">
+      <div class="status"><span>9:41</span><div class="status-icons"><span>●●●</span><span>WiFi</span><span>▮</span></div></div>
+      <div class="top-bar">
+        <div class="back-btn" onclick="goTo('s-search','')">‹ Search</div>
+        <div class="top-title">Find Item</div>
+        <div style="width:40px;"></div>
+      </div>
+      <div class="screen-body" style="padding-top:6px;">
+        <div class="search-bar"><span>🔍</span><span style="color:#fff;font-weight:600;">Keys</span></div>
+        <div class="sec">Result</div>
+        <div style="border:2px solid var(--purple);border-radius:16px;padding:14px;background:var(--lavlt);">
+          <div style="font-size:10px;font-weight:700;color:var(--success);letter-spacing:1px;margin-bottom:5px;">✓ FOUND · 3 HRS AGO</div>
+          <div style="font-size:20px;font-weight:700;color:var(--text1);">Keys</div>
+          <div style="font-size:12px;color:var(--purple);font-weight:600;margin-top:4px;">📍 Kitchen counter</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:3px;">👤 Logged by Michael · 3 hrs ago</div>
+          <div style="display:flex;gap:9px;margin-top:12px;">
+            <button class="btn btn-success btn-sm hotspot" style="flex:1;font-size:12px;" onclick="goTo('s-found-keys','Task complete! Keys marked as found.')">✓ Mark as found</button>
+            <button class="btn btn-secondary btn-sm" style="flex:1;font-size:12px;border-color:var(--purple);" onclick="goToUpdate('🔑','Keys','Kitchen Counter')">📷 Update</button>
+          </div>
+        </div>
+        <div class="sec" style="margin-top:4px;">Related items <span style="font-size:9px;color:var(--textsub);font-weight:400;letter-spacing:0;">— tap to view</span></div>
+        <div style="display:flex;gap:10px;">
+          <div style="flex:1;border:1.5px solid var(--border);border-radius:13px;padding:12px;text-align:center;background:#fff;cursor:pointer;" onclick="goTo('s-result','')">
+            <div style="font-size:22px;margin-bottom:5px;">📖</div>
+            <div style="font-size:11px;font-weight:700;color:var(--text1);">Baby Book</div>
+          </div>
+          <div style="flex:1;border:1.5px solid var(--border);border-radius:13px;padding:12px;text-align:center;background:#fff;cursor:pointer;" onclick="goTo('s-result-epipen','')">
+            <div style="font-size:22px;margin-bottom:5px;">💉</div>
+            <div style="font-size:11px;font-weight:700;color:var(--text1);">EpiPen</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav">
+        <div class="nav-item" onclick="goTo('s-home','')"><div class="nav-icon">🏠</div>Home</div>
+        <div class="nav-item" onclick="goTo('s-camera','')"><div class="nav-icon">📷</div>Log</div>
+        <div class="nav-item active"><div class="nav-icon">🔍</div>Search</div>
+        <div class="nav-item" onclick="goTo('s-alerts','')"><div class="nav-icon">🔔</div>Notifications</div>
+      </div>
+    </div>
+
+    <!-- ══ KEYS MARKED AS FOUND ══ -->
+    <div class="screen" id="s-found-keys">
+      <div class="status"><span>9:41</span><div class="status-icons"><span>●●●</span><span>WiFi</span><span>▮</span></div></div>
+      <div class="screen-body" style="align-items:center;justify-content:center;text-align:center;gap:16px;padding:32px 28px;">
+        <div style="width:72px;height:72px;background:var(--successlt);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:34px;margin:0 auto;">✅</div>
+        <div style="font-size:22px;font-weight:700;color:var(--text1);">Marked as Found!</div>
+        <div style="font-size:13px;color:var(--text3);line-height:1.6;">Keys have been marked as found.<br>The household has been notified.</div>
+        <div style="background:var(--successlt);border-radius:14px;padding:12px 16px;width:100%;text-align:left;border:1.5px solid #a8d5ba;">
+          <div style="font-size:11px;font-weight:700;color:var(--success);">✓ Keys found on the kitchen counter.</div>
+        </div>
+        <button class="btn btn-primary hotspot" onclick="goTo('s-home','')">Back to Home</button>
+        <button class="btn btn-secondary btn-sm" onclick="goTo('s-alerts','')">View Alerts</button>
+      </div>
+    </div>
+
+    <!-- ══ SCREEN 7: ALERTS ══ -->
+    <div class="screen" id="s-alerts">
+      <div class="status"><span>9:41</span><div class="status-icons"><span>●●●</span><span>WiFi</span><span>▮</span></div></div>
+      <div class="top-bar">
+        <div style="font-size:18px;font-weight:700;color:var(--text1);">Notifications</div>
+        <div class="top-action" onclick="showToast('All alerts cleared')">Clear All</div>
+      </div>
+      <div class="screen-body" style="padding-top:6px;">
+
+        <!-- PATH E — Gentle Reminder Section -->
+        <div class="sec" style="color:var(--success);">Reminder</div>
+        <div onclick="goTo('s-epipen-info','The app is reminding Sarah about the EpiPen before she leaves. No need to search — it is already packed.')" style="background:var(--successlt);border:1.5px solid #a8d5ba;border-radius:12px;padding:11px 13px;display:flex;gap:9px;cursor:pointer;">
+          <div style="font-size:16px;flex-shrink:0;margin-top:1px;">✅</div>
+          <div style="flex:1;">
+            <div style="font-size:12px;font-weight:700;color:var(--text1);">EpiPen is packed — you're good to go</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px;">📍 Baby bag · logged by Michael · 5 min ago</div>
+            <div style="font-size:10px;color:var(--success);font-weight:600;margin-top:4px;">Tap to see location details</div>
+          </div>
+          <div style="font-size:14px;color:var(--success);font-weight:700;">›</div>
+        </div>
+
+        <!-- Activity Section -->
+        <div class="sec" style="margin-top:6px;">Activity</div>
+        <div class="alert-card new" onclick="goTo('s-result','Tapped Baby Book alert — going to result page.')">
+          <div class="alert-dot"></div>
+          <div><div class="alert-title">Michael logged Baby Book</div><div class="alert-sub">📍 In the baby bag · hallway</div><div class="alert-time">2 min ago</div></div>
+        </div>
+        <div class="alert-card new" onclick="goTo('s-epipen-info','Sarah marked EpiPen as found — see location info.')">
+          <div class="alert-dot" style="background:var(--success);"></div>
+          <div><div class="alert-title">Sarah marked EpiPen as found</div><div class="alert-sub">📍 Retrieved from medicine cabinet</div><div class="alert-time">15 min ago</div></div>
+        </div>
+        <div class="sec" style="margin-top:4px;">Earlier</div>
+        <div class="alert-card" onclick="goTo('s-result-jacket','Jacket is on the hallway hook.')">
+          <div class="alert-dot faded"></div>
+          <div><div class="alert-title" style="color:var(--text2);">Mom logged Jacket</div><div class="alert-sub">📍 Hallway hook</div><div class="alert-time">1 hr ago</div></div>
+        </div>
+        <div class="alert-card" onclick="goTo('s-result-keys','Keys are on the kitchen counter.')">
+          <div class="alert-dot faded"></div>
+          <div><div class="alert-title" style="color:var(--text2);">Michael logged Keys</div><div class="alert-sub">📍 Kitchen counter</div><div class="alert-time">3 hrs ago</div></div>
+        </div>
+      </div>
+      <div class="nav">
+        <div class="nav-item" onclick="goTo('s-home','')"><div class="nav-icon">🏠</div>Home</div>
+        <div class="nav-item" onclick="goTo('s-camera','')"><div class="nav-icon">📷</div>Log</div>
+        <div class="nav-item" onclick="goTo('s-search','')"><div class="nav-icon">🔍</div>Search</div>
+        <div class="nav-item active"><div class="nav-icon">🔔</div>Notifications</div>
+      </div>
+    </div>
+
+    <!-- ══ PATH E — EPIPEN LOCATION INFO (no Mark as Found) ══ -->
+    <div class="screen" id="s-epipen-info">
+      <div class="status"><span>9:41</span><div class="status-icons"><span>●●●</span><span>WiFi</span><span>▮</span></div></div>
+      <div class="top-bar">
+        <div class="back-btn" onclick="history.go(-1); goTo('s-alerts','')">‹ Back</div>
+        <div class="top-title">Item Info</div>
+        <div style="width:40px;"></div>
+      </div>
+      <div class="screen-body" style="padding-top:6px;">
+        <!-- Reminder context -->
+        <div style="background:var(--successlt);border:1.5px solid #a8d5ba;border-radius:12px;padding:11px 13px;display:flex;gap:9px;align-items:flex-start;">
+          <div style="font-size:18px;">✅</div>
+          <div>
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;color:var(--success);margin-bottom:3px;">GENTLE REMINDER</div>
+            <div style="font-size:12px;font-weight:700;color:var(--text1);">EpiPen is already packed — no need to search</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px;">The app reminded you so you don't have to worry</div>
+          </div>
+        </div>
+        <!-- Item detail -->
+        <div style="border:2px solid #a8d5ba;border-radius:16px;padding:14px;background:var(--successlt);">
+          <div style="font-size:10px;font-weight:700;color:var(--success);letter-spacing:1px;margin-bottom:5px;">✓ CONFIRMED PACKED · 5 MIN AGO</div>
+          <div style="font-size:22px;font-weight:700;color:var(--text1);">EpiPen</div>
+          <div style="font-size:12px;color:var(--success);font-weight:600;margin-top:5px;">📍 Baby bag · hallway</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:3px;">👤 Logged by Michael · 5 min ago</div>
+          <div style="margin-top:12px;padding-top:12px;border-top:1px solid #a8d5ba;">
+            <div style="font-size:11px;color:var(--text3);font-style:italic;">You're all set. The EpiPen is in the baby bag. No action needed.</div>
+          </div>
+        </div>
+        <!-- No Mark as Found button — item is already confirmed -->
+        <div style="background:var(--bg2);border-radius:12px;padding:11px 13px;text-align:center;">
+          <div style="font-size:11px;color:var(--textsub);">This item has already been confirmed packed.</div>
+          <div style="font-size:11px;color:var(--textsub);margin-top:2px;">No further action needed.</div>
+        </div>
+        <button class="btn btn-primary hotspot" onclick="goTo('s-home','')">Back to Home</button>
+      </div>
+      <div class="nav">
+        <div class="nav-item" onclick="goTo('s-home','')"><div class="nav-icon">🏠</div>Home</div>
+        <div class="nav-item" onclick="goTo('s-camera','')"><div class="nav-icon">📷</div>Log</div>
+        <div class="nav-item" onclick="goTo('s-search','')"><div class="nav-icon">🔍</div>Search</div>
+        <div class="nav-item active"><div class="nav-icon">🔔</div>Notifications</div>
+      </div>
+    </div>
+
+    <!-- ══ JACKET RESULT ══ -->
+    <div class="screen" id="s-result-jacket">
+      <div class="status"><span>9:41</span><div class="status-icons"><span>●●●</span><span>WiFi</span><span>▮</span></div></div>
+      <div class="top-bar">
+        <div class="back-btn" onclick="goTo('s-home','')">‹ Home</div>
+        <div class="top-title">Find Item</div>
+        <div style="width:40px;"></div>
+      </div>
+      <div class="screen-body" style="padding-top:6px;">
+        <div class="search-bar"><span>🔍</span><span style="color:#fff;font-weight:600;">Jacket</span></div>
+        <div class="sec">Result</div>
+        <div style="border:2px solid var(--purple);border-radius:16px;padding:14px;background:var(--lavlt);">
+          <div style="font-size:10px;font-weight:700;color:var(--success);letter-spacing:1px;margin-bottom:5px;">✓ FOUND · 1 HR AGO</div>
+          <div style="font-size:20px;font-weight:700;color:var(--text1);">Jacket</div>
+          <div style="font-size:12px;color:var(--purple);font-weight:600;margin-top:4px;">📍 Hallway hook</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:3px;">👤 Logged by Michael · 1 hr ago</div>
+          <div style="display:flex;gap:9px;margin-top:12px;">
+            <button class="btn btn-success btn-sm hotspot" style="flex:1;font-size:12px;" onclick="goTo('s-found-jacket','Jacket marked as found!')">✓ Mark as found</button>
+            <button class="btn btn-secondary btn-sm" style="flex:1;font-size:12px;border-color:var(--purple);" onclick="goToUpdate('🧥','Jacket','Hallway Hook')">📷 Update</button>
+          </div>
+        </div>
+        <div class="sec" style="margin-top:4px;">Related items <span style="font-size:9px;color:var(--textsub);font-weight:400;letter-spacing:0;">— tap to view</span></div>
+        <div style="display:flex;gap:10px;">
+          <div style="flex:1;border:1.5px solid var(--border);border-radius:13px;padding:12px;text-align:center;background:#fff;cursor:pointer;" onclick="goTo('s-result','')">
+            <div style="font-size:22px;margin-bottom:5px;">📖</div>
+            <div style="font-size:11px;font-weight:700;color:var(--text1);">Baby Book</div>
+          </div>
+          <div style="flex:1;border:1.5px solid var(--border);border-radius:13px;padding:12px;text-align:center;background:#fff;cursor:pointer;" onclick="goTo('s-result-keys','')">
+            <div style="font-size:22px;margin-bottom:5px;">🔑</div>
+            <div style="font-size:11px;font-weight:700;color:var(--text1);">Keys</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav">
+        <div class="nav-item active" onclick="goTo('s-home','')"><div class="nav-icon">🏠</div>Home</div>
+        <div class="nav-item" onclick="goTo('s-camera','')"><div class="nav-icon">📷</div>Log</div>
+        <div class="nav-item" onclick="goTo('s-search','')"><div class="nav-icon">🔍</div>Search</div>
+        <div class="nav-item" onclick="goTo('s-alerts','')"><div class="nav-icon">🔔</div>Notifications</div>
+      </div>
+    </div>
+
+    <!-- ══ JACKET MARKED AS FOUND ══ -->
+    <div class="screen" id="s-found-jacket">
+      <div class="status"><span>9:41</span><div class="status-icons"><span>●●●</span><span>WiFi</span><span>▮</span></div></div>
+      <div class="screen-body" style="align-items:center;justify-content:center;text-align:center;gap:16px;padding:32px 28px;">
+        <div style="width:72px;height:72px;background:var(--successlt);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:34px;margin:0 auto;">✅</div>
+        <div style="font-size:22px;font-weight:700;color:var(--text1);">Marked as Found!</div>
+        <div style="font-size:13px;color:var(--text3);line-height:1.6;">Jacket has been marked as found.<br>The household has been notified.</div>
+        <div style="background:var(--successlt);border-radius:14px;padding:12px 16px;width:100%;text-align:left;border:1.5px solid #a8d5ba;">
+          <div style="font-size:11px;font-weight:700;color:var(--success);">✓ Jacket found on the hallway hook.</div>
+        </div>
+        <button class="btn btn-primary hotspot" onclick="goTo('s-home','')">Back to Home</button>
+        <button class="btn btn-secondary btn-sm" onclick="goTo('s-alerts','')">View Alerts</button>
+      </div>
+    </div>
+
+    <!-- ══ SCREEN 8: MENU ══ -->
+    <div class="screen" id="s-menu">
+      <div class="status"><span>9:41</span><div class="status-icons"><span>●●●</span><span>WiFi</span><span>▮</span></div></div>
+      <div class="top-bar">
+        <div class="back-btn" onclick="goTo('s-home','')">‹ Home</div>
+        <div class="top-title">Menu</div>
+        <div style="width:40px;"></div>
+      </div>
+      <div class="screen-body" style="padding-top:6px;">
+        <div style="display:flex;align-items:center;gap:11px;padding:12px 14px;background:var(--lavlt);border-radius:14px;cursor:pointer;" onclick="showToast('Profile settings')">
+          <div style="width:40px;height:40px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex-shrink:0;">SC</div>
+          <div style="flex:1;"><div style="font-size:14px;font-weight:700;color:var(--text1);">Sarah Chen</div><div style="font-size:11px;color:var(--text3);">The Chens · Admin</div></div>
+          <div class="chevron">›</div>
+        </div>
+        <div class="sec" style="margin-top:4px;">Account</div>
+        <div class="menu-row" onclick="showToast('Profile — Name, Photo, Password')">
+          <div class="menu-row-left"><div class="menu-icon-wrap">👤</div><div><div class="menu-label">Profile</div><div class="menu-sub">Name, Photo, Password</div></div></div>
+          <div class="chevron">›</div>
+        </div>
+        <div class="menu-row" onclick="showToast('Logging out...')">
+          <div class="menu-row-left"><div class="menu-icon-wrap">🚪</div><div><div class="menu-label">Log out</div></div></div>
+          <div class="chevron">›</div>
+        </div>
+        <div class="menu-row" onclick="showToast('Delete Account — not in this prototype')">
+          <div class="menu-row-left"><div class="menu-icon-wrap red">🗑</div><div><div class="menu-label" style="color:var(--red);">Delete Account</div></div></div>
+          <div class="chevron">›</div>
+        </div>
+        <div class="sec" style="margin-top:4px;">Household</div>
+        <div class="menu-row" onclick="showToast('Manage Members — invite or remove caregivers')">
+          <div class="menu-row-left"><div class="menu-icon-wrap">👥</div><div><div class="menu-label">Manage Members</div><div class="menu-sub">Invite or remove caregivers</div></div></div>
+          <div class="chevron">›</div>
+        </div>
+        <div class="sec" style="margin-top:4px;">Preference & Help</div>
+        <div class="menu-row" onclick="showToast('Notification Settings')">
+          <div class="menu-row-left"><div class="menu-icon-wrap accent">🔔</div><div><div class="menu-label">Notification Settings</div></div></div>
+          <div class="chevron">›</div>
+        </div>
+        <div class="menu-row" onclick="showToast('How to Use — guide')">
+          <div class="menu-row-left"><div class="menu-icon-wrap">❓</div><div><div class="menu-label">How to Use</div></div></div>
+          <div class="chevron">›</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end screen-wrap -->
+</div><!-- end phone-shell -->
+
+<!-- Controls -->
+<div class="proto-controls">
+  <div class="screen-indicator" id="screen-indicator">Screen 01 — Sign In · Entry Path</div>
+  <div class="ctrl-row">
+    <button class="ctrl-btn" onclick="restart()">↩ Restart</button>
+    <button class="ctrl-btn" id="hotspot-btn" onclick="toggleHotspots()">Show tappable areas</button>
+  </div>
+  <div class="ctrl-row">
+    <button class="ctrl-btn primary" onclick="startTask1()">▶ Task 1: Log an Item</button>
+    <button class="ctrl-btn primary" onclick="startTask2()">▶ Task 2: Find an Item</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+
+</body>
+</html>
